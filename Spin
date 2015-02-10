@@ -1,1 +1,108 @@
 Spin code goes here
+CON
+   _xinfreq=6_250_000          'external crystal oscillates at 5MHz
+  _clkmode=xtal1+pll16x         'set the system clock to 10MHz
+
+VAR
+  long ReadAHRS
+
+PUB Main
+  cognew(@AHRS,@ReadAHRS)
+  pst.start
+  repeat
+    pst.dec(ReadAHRS)
+    pst.newLine
+
+DAT
+
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    ' COPY OF ADC ASSEMBLY CODE FROM ADVANCED MECHATRONICS BOOK '
+    '                                                           '
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'P0 = CS
+'P1 = CLK
+'P2 = MISO
+'P3 = MOSI
+              org
+'Collect a sample of data from the AHRS
+AHRS          mov       dira,#%1011             'Set P2 to be an input and P0/P1 to be outputs
+Loop          mov       outa,#%0000             'Set pins Low
+              mov       counter,cnt             'Store the current system counter value as counter
+              add       counter,#120            'Add 120 clock cycles (1200ns) to counter value
+
+'Send DREG_EULER_PHI_THETA command to AHRS
+'send 112 to AHRS via pin 3
+
+'Create 16 clock pusles to select chip, shift out the dummy bit, and shift out the data word, to get Phi
+              mov       i,#16                   'Run "For Loop" from i=16 to i=1
+ForLoop1      mov       outa,#%00               'Set clk pin low and keep cs pin low
+              waitcnt   counter,#120            'Wait 120 clock cycles (1200ns) and add another 120 to counter
+              mov       dataBit,ina             'Save ina register as dataBit
+              shr       dataBit,#2              'Shift dataBit right two spaces so that P2's bit is the LSB
+              and       dataBit,#1              'Clear all bits except the LSB
+              shl       dataPhi,#1              'Shift dataPhi one bit to the left
+              add       dataPhi,dataBit         'Add the current dataBit to the previous dataPhi
+              mov       outa,#%10               'Set clk pin High (keep cs pin Low)
+              waitcnt   counter,#120            'Wait 1200ns and add another 120 to counter
+              djnz      i,#ForLoop1             'Decrement i by 1 and if i isn't 0, jump back to ForLoop1
+              wrlong    dataPhi,par             'Write AHRS's data Phi value to central hub ram
+'Create 16 clock pusles to select chip, shift out the dummy bit, and shift out the data word, to get Theta
+              mov       i,#16                   'Run "For Loop" from i=16 to i=1
+ForLoop2      mov       outa,#%00               'Set clk pin low and keep cs pin low
+              waitcnt   counter,#120            'Wait 120 clock cycles (1200ns) and add another 120 to counter
+              mov       dataBit,ina             'Save ina register as dataBit
+              shr       dataBit,#2              'Shift dataBit right two spaces so that P2's bit is the LSB
+              and       dataBit,#1              'Clear all bits except the LSB
+              shl       dataTheta,#1            'Shift dataTheta one bit to the left
+              add       dataTheta,dataBit       'Add the current dataBit to the previous dataTheta
+              mov       outa,#%10               'Set clk pin High (keep cs pin Low)
+              waitcnt   counter,#120            'Wait 1200ns and add another 120 to counter
+              djnz      i,#ForLoop2             'Decrement i by 1 and if i isn't 0, jump back to ForLoop
+              wrlong    dataTheta,par           'Write AHRS's data Theta value to central hub ram
+                            
+              mov       outa,#%0000             'Set pins Low
+              mov       counter,cnt             'Store the current system counter value as counter
+              add       counter,#120            'Add 120 clock cycles (1200ns) to counter value
+
+'Send DREG_EULER_PSI command to AHRS
+'Send 113 to AHRS via pin 3
+
+'Create 16 clock pulses to collect Psi values
+              mov       i, #16                  'Run For Loop from i=16 to i=1
+ForLoop3      mov       outa, #%00              'set clk/cs pins low
+              waitcnt   counter,#120            'Wait 120 clock cycles (1200ns) and add another 120 to counter
+              mov       dataBit,ina             'Save ina register as dataBit
+              shr       dataBit,#2              'Shift dataBit right two spaces so that P2's bit is the LSB
+              and       dataBit,#1              'Clear all bits except the LSB
+              shl       dataPsi,#1              'Shift dataPsi one bit to the left
+              add       dataPsi,dataBit         'Add the current dataBit to the previous dataPsi
+              mov       outa,#%10               'Set clk pin High (keep cs pin Low)
+              waitcnt   counter,#120            'Wait 1200ns and add another 120 to counter
+              djnz      i,#ForLoop3             'Decrement i by 1 and if i isn't 0, jump back to ForLoop3
+              wrlong    dataPsi,par             'Write AHRS's data Psi value to central hub ram
+'Create 16 clock pulses to finish SPI
+              mov       i, #16
+ForLoop3      mov       outa, #%00              'set clk/cs pins low
+              waitcnt   counter,#120            'Wait 120 clock cycles (1200ns) and add another 120 to counter
+              mov       dataBit,ina             'Save ina register as dataBit
+              shr       dataBit,#2              'Shift dataBit right two spaces so that P2's bit is the LSB
+              and       dataBit,#1              'Clear all bits except the LSB
+              mov       outa,#%10               'Set clk pin High (keep cs pin Low)
+              waitcnt   counter,#120            'Wait 1200ns and add another 120 to counter
+              djnz      i,#ForLoop3             'Decrement i by 1 and if i isn't 0, jump back to ForLoop3
+              
+'Send the word of data collected from the AHRS to the central hub RAM
+              wrlong    dataPhi,par             'Write AHRS's data long to the central hub RAM
+              wrlong    dataTheta,par           'Write AHRS's data long to the central hub RAM
+              wrlong    dataPsi,par             'Write AHRS's data long to the central hub RAM
+              mov       outa,#%11               'Set cs and clk pins High
+              waitcnt   counter,0               'Wait for 1200ns
+              jmp       #Loop                   'Jump back to instruction labeled "Loop" in this program
+
+dataBit       long      0                       'Stores each data bit as it's being sent from the AHRS
+dataPhi       long      0                       'Collects the data bits and forms a word of data from the AHRS
+dataTheta     long      0                       'Collects the data bits and forms a word of data from the AHRS
+dataPsi       long      0                       'Collects the data bits and forms a word of data from the AHRS
+i             res                               'Used as a counter in the ForLoop
+counter       res                               'Reserve one long to store the counter value
+              fit
