@@ -90,10 +90,6 @@ ForLoop3      mov       outa, #%00              'set clk/cs pins low
               waitcnt   counter,#120            'Wait 1200ns and add another 120 to counter
               djnz      i,#ForLoop3             'Decrement i by 1 and if i isn't 0, jump back to ForLoop3
               
-'Send the word of data collected from the AHRS to the central hub RAM
-              wrlong    dataPhi,par             'Write AHRS's data long to the central hub RAM
-              wrlong    dataTheta,par           'Write AHRS's data long to the central hub RAM
-              wrlong    dataPsi,par             'Write AHRS's data long to the central hub RAM
               mov       outa,#%11               'Set cs and clk pins High
               waitcnt   counter,0               'Wait for 1200ns
               jmp       #Loop                   'Jump back to instruction labeled "Loop" in this program
