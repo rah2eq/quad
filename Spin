@@ -3,14 +3,36 @@ CON
   _clkmode=xtal1+pll16x        'set the system clock to 100MHz
 
 VAR
-  long ReadAHRS
+  long ReadAHRS, angle, angular velocity, throttle 'Global variables for AHRS and PD_control method
+  long roll_control, roll_velocity, pitch_control, pitch_velocity, yaw_control, yaw_velocity 'G.Vs. for PD_calc method
+  long Stack0[100]
 
 PUB Main
-  cognew(@AHRS,@ReadAHRS)
+  coginit(1,@AHRS,@ReadAHRS)
+  coginit(2,PD_calc,@Stack0)
   pst.start
   repeat
     pst.dec(ReadAHRS)
     pst.newLine
+
+PUB PD_calc 'stores each control value as a global variable
+   repeat
+      PD_control(roll_angle,roll_velocity)
+      roll_control:=control
+      PD_control(pitch_angle,pitch_velocity)
+      pitch_control:=control
+      PD_control(yaw_angle,yaw_velocity)
+      yaw_control:=control
+      
+PUB PD_control(angle,angular_velocity) | error, SetPoint, Pc, Dc, control, throttle
+
+  repeat
+    error:=SetPoint-angle
+    Pc:=error*Kp
+     
+    Dc:=angular_velocity*Kd
+     
+    control:=Pc+Dc   ' #>0 <#1000
 
 DAT
 
